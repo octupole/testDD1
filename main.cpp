@@ -20,6 +20,9 @@ inline void init(array3<double> f, split3 d)
   }
 }
 
+template<class ftype>
+void mygatheryz(const ftype *part, ftype *whole, const split3& d,
+              const MPI_Comm& communicator);
 
 int main(int argc, char* argv[])
 {
@@ -133,7 +136,9 @@ int main(int argc, char* argv[])
   defaultmpithreads=fftw::maxthreads;
 
   if(group.rank < group.size) {
-    bool main=group.rank == 0;
+	    bool main=group.rank == 0;
+	    bool main1=group.rank == 1;
+	    bool main2=group.rank == 2;
     if(!quiet && main) {
       cout << "Configuration: "
            << group.size << " nodes X " << fftw::maxthreads
@@ -159,11 +164,6 @@ int main(int argc, char* argv[])
     else
       f.Dimension(df.x,df.y,df.Z,doubleAlign(df.n));
 
-    cout << f.Size()<< " -- "<< g.Size()<< endl;
-    cout << "df "<< df.x << " "<< df.y << " "<< df.Z << " "<<endl;
-    cout << "dg "<< dg.x << " "<< dg.y << " "<< dg.Z << " "<<endl;
-    cout << "tt " << nx*ny*nzp<< " .. " << group.size*dg.x*dg.y*dg.Z<<endl;
-    exit(1);
     rcfft3dMPI rcfft(df,dg,f,g,mpiOptions(divisor,alltoall));
 
     if(!quiet && group.rank == 0)
@@ -190,14 +190,40 @@ int main(int argc, char* argv[])
 
     	gatherxy(f(), flocal(), dfgather, group.active);
     	gatherxy(f(), fgather(), dfgather, group.active);
+
     	if(main && !quiet)
     		cout << "Gathered input:\n" <<  fgather << endl;
 
     	rcfft.Forward(f,g);
-
     	if(main) {
     		localForward.fft(flocal,glocal);
     		cout << endl;
+    	}
+//    	if(main2) {
+//    		cout << "2- "<<dg.x0 << " "<< dg.x <<endl;
+//    		cout << "2- "<<dg.y0 << " "<< dg.y <<endl;
+//    		cout << "2- "<<dg.z0 << " "<< dg.z <<endl;
+//    		for(size_t o{0};o< dg.x;o++)
+//        		for(size_t p{0};p< dg.y;p++)
+//            		for(size_t q{0};q<dg.z;q++)
+//    		{
+//            		cout << o+dg.x0 << " "<< p+dg.y0 << " "<< q+dg.z0 << " "<< g[o][p][q] << " "<<endl;
+//    		}
+//    	}
+    	if(main) {
+//    		cout << "0- "<<dg.x0 << " "<< dg.x <<endl;
+//    		cout << "0- "<<dg.y0 << " "<< dg.y <<endl;
+//    		cout << "0- "<<dg.z0 << " "<< dg.z <<endl;
+//    		cout << "zero "<<g[0][1][0]<< " 0 1 0 "<<endl;
+//    		cout << "zero "<<glocal[0][1][0]<< " 0 1 0 "<<endl;
+//    		for(size_t o{0};o< nx;o++)
+//        		for(size_t p{0};p< ny;p++)
+//            		for(size_t q{0};q< nzp;q++)
+//    		{
+//            			if(glocal[o][p][q].re != 0 || glocal[o][p][q].im){
+//            				cout << o << " "<< p << " "<< q << " "<< glocal[o][p][q] << " "<<endl;
+  //          			}
+//    		}
     	}
 
     	if(!quiet && showresult) {
@@ -207,6 +233,7 @@ int main(int argc, char* argv[])
     	}
 
     	gatheryz(g(),ggather(),dg,group.active);
+    	mygatheryz(g(),glocal(),dg,group.active);
     	if(!quiet && main)
     		cout << "Gathered output:\n" <<  ggather << endl;
 
@@ -224,13 +251,37 @@ int main(int argc, char* argv[])
     			cout << "Distributed back to input:" << endl;
     		show(f(),dfgather.x,dfgather.y,dfgather.Z,group.active);
     	}
+    	if(main2) {
+    		for(size_t o{0};o< df.x;o++)
+        		for(size_t p{0};p< df.y;p++)
+            		for(size_t q{0};q<df.z;q++)
+    		{
+            		cout << o+df.x0 << " "<< p+df.y0 << " "<< q+df.z0 << " "<< f[o][p][q] << " "<<endl;
+    		}
+    	}
 
     	gatherxy(f(),fgather(),dfgather,group.active);
+//    	if(main) {
+//    		for(size_t o{0};o< nx;o++)
+//        		for(size_t p{0};p< ny;p++)
+//            		for(size_t q{0};q<nz;q++)
+//    		{
+//            		cout << o+df.x0 << " "<< p+df.y0 << " "<< q+df.z0 << " "<< fgather[o][p][q] << " "<<endl;
+//    		}
+//    	}
+
     	if(!quiet && main)
     		cout << "Gathered back to input:\n" <<  fgather << endl;
 
     	if(main) {
+//    		for(unsigned int i=0; i < dg.X; ++i)
+//        		for(unsigned int j=0; j < dg.Y; ++j)
+//            		for(unsigned int k=0; k < dg.Z; ++k) {
+//        				  cout << " " <<i << " " <<j << " " <<k <<glocal[i][j][k]  <<endl;
+//        			  }
+//    		exit(1);
     		localBackward.fftNormalized(glocal,flocal);
+
     	}
 
     	if(!quiet && main)
@@ -281,4 +332,43 @@ int main(int argc, char* argv[])
   MPI_Finalize();
 
   return retval;
+}
+// Gather an MPI-distributed array onto the rank 0 process.
+// The distributed array has dimensions X*y*z.
+// The gathered array has dimensions    X*Y*Z.
+template<class ftype>
+void mygatheryz(const ftype *part, ftype *whole, const split3& d,
+              const MPI_Comm& communicator)
+{
+  int size, rank;
+  MPI_Comm_size(communicator,&size);
+  MPI_Comm_rank(communicator,&rank);
+
+  const unsigned int X=d.X;
+  const unsigned int Y=d.Y;
+  const unsigned int Z=d.Z;
+  const unsigned int y=d.xy.y;
+  const unsigned int z=d.z;
+  const unsigned int y0=d.xy.y0;
+  const unsigned int z0=d.z0;
+
+  if(rank == 0){
+	  cout <<" P2 " <<  X << " " << Y << " " << Z <<endl;
+      unsigned int n=X*y*z;
+      if(n > 0) {
+    	  const int count=y;
+    	  const int stride=Z;
+    	  const int length=z;
+    	  for(unsigned int i=0; i < X; ++i) {
+    		  const int outoffset=i*Y*Z+y0*Z+z0;
+    		  const int inoffset=i*y*z;
+    		  for(unsigned int j=0; j < count; ++j)
+    			  for(unsigned int k=0; k < length; ++k){
+    				  cout << i << " " << y0+j << " " << z0+k << " " <<*(part+inoffset+j*length+k) << " -- "<< outoffset+j*stride+k <<endl;
+    			  }
+
+    	  }
+      }
+  }
+  exit(1);
 }
