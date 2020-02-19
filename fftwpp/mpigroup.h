@@ -44,8 +44,6 @@ public:
     	int major=ceilquotient(size,Y);
     	int p=rank % major;
     	int q=rank / major;
-		  std::cout << rank << " " << p<<" " << q <<std::endl;
-
     	/* Split nodes into row and columns */
     	MPI_Comm_split(active,p,q,&communicator);
     	MPI_Comm_split(active,q,p,&communicator2);
@@ -59,7 +57,6 @@ public:
 		  unsigned int major=npy;
 		  int p=rank % major;
 		  int q=rank / major;
-		  std::cout << rank << " " << p<<" " << q <<std::endl;
 		  /* Split nodes into row and columns */
 		  MPI_Comm_split(active,p,q,&communicator);
 		  MPI_Comm_split(active,q,p,&communicator2);
@@ -164,10 +161,6 @@ public:
     z0=yz.y0;
     n2=yz.n;
     n=std::max(xy.n*z,x*n2);
-    if(spectral){
-    	std::cout <<"--> " <<" "<<x << " " << x0 <<std::endl;
-    	std::cout <<"-->>"<< " "<<y << " " << y0<<std::endl;
-    }
   }
   
   split3(unsigned int X, unsigned int Y, unsigned int Z,

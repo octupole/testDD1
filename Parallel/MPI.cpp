@@ -6,9 +6,7 @@
  */
 
 #include "MPI.h"
-#include <mpi.h>
 #include <cmath>
-#include <boost/range/irange.hpp>
 #include "../Tools/MyTools.hpp"
 using outputs::Log;
 
@@ -57,8 +55,8 @@ void MPI::setDims(const int n, double cut, double a, double b, double c){
 		nc=this->findSize3D(n,my);
 	}
 }
-mpi::communicator MPI::ResizeWorld(mpi::communicator worldx0){
-	if(world0.size() != nc[XX]*nc[YY]*nc[ZZ]){
+MPI_Comm & MPI::ResizeWorld(MPI_Comm & worldx0){
+	if(_size(worldx0) != nc[XX]*nc[YY]*nc[ZZ]){
 		mpi::group local = worldx0.group();
 		boost::integer_range<int> r = boost::irange(nc[XX]*nc[YY]*nc[ZZ]-1, worldx0.size()-1);
 		mpi::group subgroup = local.exclude(r.begin(), r.end());
